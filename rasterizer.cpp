@@ -346,7 +346,7 @@ static Eigen::Vector2f interpolate(float alpha, float beta, float gamma, const E
 //Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eigen::Vector3f, 3>& view_pos, const Eigen::Matrix3f& TBN)
 {  
-    // TODO: From your HW2, get the triangle rasterization code.
+    // TODO: Use the triangle rasterization code below.
     // TODO: Inside your rasterization loop:
     //    * v[i].w() is the vertex view space depth value z.
     //    * Z is interpolated view space depth for the current pixel
@@ -367,6 +367,28 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
     // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
     // Use: auto pixel_color = fragment_shader(payload);
 
+    auto v = t.toVector4();
+
+    int minX = std::max(0, static_cast<int>(floor(std::min(v[0].x(), std::min(v[1].x(), v[2].x())))));
+    int maxX = std::min(width - 1, static_cast<int>(ceil(std::max(v[0].x(), std::max(v[1].x(), v[2].x())))));
+    int minY = std::max(0, static_cast<int>(floor(std::min(v[0].y(), std::min(v[1].y(), v[2].y())))));
+    int maxY = std::min(height - 1, static_cast<int>(ceil(std::max(v[0].y(), std::max(v[1].y(), v[2].y())))));
+
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            if (insideTriangle(x, y, t.v)) {
+                auto [alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+                float sum_W = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                float depth_Z = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                depth_Z *= sum_W;
+
+                if (depth_Z > depth_buf[get_index(x, y)]) {
+                    set_pixel(Eigen::Vector3f(x, y, depth_Z), t.getColor());
+                    depth_buf[get_index(x, y)] = depth_Z;
+                }
+            }
+        }
+    }
  
 }
 
